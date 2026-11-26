@@ -1,0 +1,64 @@
+menu "Audio input"
+
+    comment "Pin defaults come from the vendor demo for JC8012P4A1 (docs/hardware.md), not from measurement."
+
+    config AUDIO_I2S_PORT
+        int "I2S port"
+        default 1
+        range 0 2
+
+    config AUDIO_I2S_MCLK
+        int "I2S MCLK GPIO"
+        default 13
+    config AUDIO_I2S_BCLK
+        int "I2S BCLK GPIO"
+        default 12
+    config AUDIO_I2S_WS
+        int "I2S LRCK/WS GPIO"
+        default 10
+    config AUDIO_I2S_DIN
+        int "I2S data in (codec ADC -> P4) GPIO"
+        default 11
+
+    config AUDIO_ES8311_ADDR
+        hex "ES8311 I2C address (8-bit form used by esp_codec_dev)"
+        default 0x30
+        help
+            esp_codec_dev expects the 8-bit address; ES8311 with CE low is 0x18 (7-bit) = 0x30.
+
+    choice AUDIO_SAMPLE_RATE
+        prompt "Sample rate"
+        default AUDIO_SAMPLE_RATE_48000
+        config AUDIO_SAMPLE_RATE_44100
+            bool "44.1 kHz"
+        config AUDIO_SAMPLE_RATE_48000
+            bool "48 kHz"
+    endchoice
+
+    config AUDIO_SAMPLE_RATE_HZ
+        int
+        default 44100 if AUDIO_SAMPLE_RATE_44100
+        default 48000
+
+    config AUDIO_MIC_SLOT_RIGHT
+        bool "Microphone is in the right I2S slot"
+        default n
+        help
+            Capture is stereo; ES8311 puts the ADC in one slot and (optionally) the DAC
+            reference in the other. Both slot levels are logged so this can be verified.
+
+    config AUDIO_MIC_GAIN_DB
+        int "ES8311 microphone PGA gain (dB)"
+        default 24
+        range 0 42
+        help
+            Vendor demo uses 24 dB.
+
+    config AUDIO_RING_SECONDS
+        int "PSRAM ring buffer length (seconds)"
+        default 12
+        range 9 60
+        help
+            Must hold at least the 8 s recognition clip (SPEC 8).
+
+endmenu

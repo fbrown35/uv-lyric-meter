@@ -1,0 +1,32 @@
+menu "Music display"
+
+    config MUSIC_DISPLAY_BOARD_NAME
+        string "Verified board manufacturer and model"
+        default "GUITION JC8012P4A1 (image identification)"
+        help
+            Record the board identity after checking the product label and BSP.
+            This label does not enable or configure any peripherals.
+
+    config MUSIC_DISPLAY_VU_REF_DBFS
+        int "Microphone level corresponding to 0 VU (dBFS)"
+        default -18
+        range -60 0
+        help
+            SPEC 7.2 default is -18 dBFS. Lower values make the displayed meter
+            more sensitive without increasing microphone ADC gain or clipping.
+            This user's current preference is -27 dBFS (+9 dB display sensitivity).
+
+    config MUSIC_DISPLAY_PCM_DUMP
+        bool "Debug: dump 1 s of raw mic PCM over serial every 10 s"
+        default n
+        help
+            Prints lines "PCM <seq> <hex>" (int16 little-endian) for offline analysis.
+
+    config MUSIC_DISPLAY_DIAGNOSTICS
+        bool "Show M0 orientation/touch screen instead of the M2 analog meters"
+        default y
+        help
+            Keep enabled until the panel orientation and four touch corners are verified.
+            Disable to run the microphone-driven stereo-mirrored VU preview.
+
+endmenu

@@ -1,0 +1,197 @@
+menu "Board (GUITION JC8012P4A1)"
+
+    comment "Pin defaults come from the vendor demo / spec sheet (docs/hardware.md), not from measurement."
+
+    config BOARD_I2C_PORT
+        int "I2C port (touch + audio codec)"
+        default 1
+        range 0 1
+
+    config BOARD_I2C_SDA
+        int "I2C SDA GPIO"
+        default 7
+
+    config BOARD_I2C_SCL
+        int "I2C SCL GPIO"
+        default 8
+
+    config BOARD_I2C_FREQ_HZ
+        int "I2C clock (Hz)"
+        default 400000
+
+    config BOARD_LCD_RST
+        int "LCD reset GPIO (-1 = none)"
+        default 27
+
+    config BOARD_LCD_BACKLIGHT
+        int "LCD backlight PWM GPIO"
+        default 23
+
+    config BOARD_TOUCH_RST
+        int "Touch reset GPIO (-1 = none)"
+        default 22
+
+    config BOARD_TOUCH_INT
+        int "Touch interrupt GPIO (-1 = none)"
+        default 21
+
+    config BOARD_TOUCH_MIRROR_X
+        bool "Mirror touch X (panel-native coordinates)"
+        default n
+
+    config BOARD_TOUCH_MIRROR_Y
+        bool "Mirror touch Y (panel-native coordinates)"
+        default y
+        help
+            Vendor demo uses mirror_y=1. Verify on hardware: a tap must land
+            under the finger in the landscape UI.
+
+    config BOARD_BACKLIGHT_PWM_HZ
+        int "Backlight PWM frequency (Hz)"
+        default 50000
+        range 1000 100000
+        help
+            Keep this above the audio band. At the vendor's 20 kHz the PWM couples into the
+            ES8311 mic input as a -47 dBFS tone (measured 2026-11-25); the real noise floor is ~-61 dBFS.
+
+    config BOARD_DSI_PHY_LDO_CHAN
+        int "On-chip LDO channel powering the MIPI D-PHY (0 = none)"
+        default 3
+
+    config BOARD_DSI_PHY_LDO_MV
+        int "D-PHY LDO voltage (mV)"
+        default 2500
+
+    config BOARD_DSI_LANE_MBPS
+        int "MIPI-DSI lane bit rate (Mbps)"
+        default 1500
+        help
+            Vendor BSP uses 1500 Mbps with 2 data lanes.
+
+    choice BOARD_PANEL_INIT
+        prompt "JD9365 panel init sequence"
+        default BOARD_PANEL_INIT_FACTORY
+        config BOARD_PANEL_INIT_FACTORY
+            bool "From the board's shipped firmware (recommended)"
+        config BOARD_PANEL_INIT_DEMO
+            bool "From the vendor demo repo (older panel revision?)"
+    endchoice
+
+    config BOARD_PANEL_FLIP_ROWS
+        bool "Panel: reverse gate scan (flip native rows; MADCTL GS)"
+        default n
+        help
+            Keep disabled for the verified V2 initialization and 270-degree UI rotation.
+
+    config BOARD_PANEL_FLIP_COLS
+        bool "Panel: reverse source scan (flip native columns; MADCTL SS)"
+        default n
+
+    config BOARD_PANEL_SCAN_OFFSET
+        int "Native row scan-origin calibration (pixels, wraps at 1280)"
+        default 0
+        range 0 1279
+        help
+            Default 0 preserves the unmodified driver path. A positive value shifts
+            outgoing native rows forward modulo 1280. This is a software calibration,
+            not a documented controller register. On this unit the direct eight-band
+            test photo IMG_9541.HEIC suggests a 256-row offset; verify with markers.
+            Nonzero values use a synchronous CPU copy for LVGL flush completion.
+
+    config BOARD_DPI_CLOCK_MHZ
+        int "MIPI-DPI pixel clock (MHz)"
+        default 80
+        range 30 100
+        help
+            Verified V2 profile uses 80 MHz with 1500 Mbps lanes and vertical 4/10/30.
+
+    config BOARD_DPI_H_FRONT_PORCH
+        int "DPI horizontal front porch (pixels)"
+        default 40
+        range 1 200
+        help
+            Vendor demo uses 40 pixels. TODO: verify the exact panel timing range.
+            A diagnostic value of 48 makes the 888-pixel total line exactly
+            representable at 60 MHz DPI and 1000 Mbps DSI (1850 byte clocks).
+
+    config BOARD_DPI_V_BACK_PORCH
+        int "DPI vertical back porch (lines)"
+        default 10
+        range 1 100
+        help
+            Old-panel vendor demo uses 8; the JC8012P4A1 V2 panel profile
+            reported in HomeTiles issue 18 uses 10. Verify on the fitted panel.
+
+    config BOARD_DPI_V_FRONT_PORCH
+        int "DPI vertical front porch (lines)"
+        default 30
+        range 1 100
+        help
+            Old-panel vendor demo uses 20; the JC8012P4A1 V2 panel profile
+            reported in HomeTiles issue 18 uses 30. Verify on the fitted panel.
+
+    choice BOARD_ROTATION
+        prompt "Landscape rotation (panel is 800x1280 portrait)"
+        default BOARD_ROTATION_270
+
+        config BOARD_ROTATION_0
+            bool "0 degrees (native portrait, diagnostic only)"
+        config BOARD_ROTATION_90
+            bool "90 degrees"
+        config BOARD_ROTATION_270
+            bool "270 degrees"
+    endchoice
+
+    config BOARD_DISPLAY_SELFTEST
+        bool "Run display self-test at boot (DSI link sweep, then framebuffer bands)"
+        default n
+        help
+            Bring-up diagnostic. Turn off once the panel is confirmed working.
+
+    config BOARD_DISPLAY_RAW_SCAN_TEST
+        bool "Hold a direct framebuffer scan test instead of LVGL"
+        default n
+        help
+            Writes eight RGB565 bands directly to the native framebuffer, bypassing
+            LVGL rotation and DMA2D copies. Landscape left-to-right is expected to be
+            red, yellow, green, cyan, blue, magenta, white, gray, with a white marker
+            at top-left and black marker at bottom-right. Disable after diagnosis.
+
+    config BOARD_DISPLAY_HOST_PATTERN
+        bool "Use DSI host pattern instead of framebuffer diagnostic"
+        depends on BOARD_DISPLAY_RAW_SCAN_TEST
+        default n
+        help
+            Holds the DSI host hardware color bars with the existing link timing.
+            Bypasses framebuffer pixel reads, CPU copies and LVGL rotation.
+
+    config BOARD_DISPLAY_FIFO_PROBE
+        bool "Probe framebuffer underrun with white fallback pixels"
+        depends on BOARD_DISPLAY_RAW_SCAN_TEST && !BOARD_DISPLAY_HOST_PATTERN
+        default n
+        help
+            Diagnostic for ESP32-P4 rev3. Uses the documented DSI bridge fallback
+            data field and unmasks early-line underrun reporting. Disable afterward.
+
+    config BOARD_DISPLAY_RAW_RGB888
+        bool "Use RGB888 for the raw framebuffer diagnostic"
+        depends on BOARD_DISPLAY_RAW_SCAN_TEST && !BOARD_DISPLAY_HOST_PATTERN
+        default n
+        help
+            Uses matching RGB888 framebuffer, DSI output and panel pixel format.
+            Diagnostic only; the normal LVGL application remains RGB565.
+
+    config BOARD_DSI_OUTPUT_RGB888
+        bool "Convert RGB565 framebuffer to RGB888 DSI output"
+        default y
+        help
+            Keeps the RGB565 framebuffer but uses the DSI bridge's RGB888 output
+            and a matching 24-bit panel pixel format. Verify link bandwidth.
+
+    config BOARD_LVGL_BUF_LINES
+        int "LVGL draw buffer height (lines of the 800px native width)"
+        default 100
+        help
+            Partial render buffer, allocated in PSRAM. Two buffers are used.
+
+endmenu
